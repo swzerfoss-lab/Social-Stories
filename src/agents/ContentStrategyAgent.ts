@@ -9,6 +9,16 @@ import type {
   AgentResponse,
 } from '../types/index.js';
 
+function toStringList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === 'string');
+  }
+  if (typeof value === 'string' && value.trim() !== '') {
+    return [value];
+  }
+  return [];
+}
+
 /**
  * Content Strategy Agent
  * Responsible for planning content calendars, identifying trends, and suggesting themes
@@ -169,7 +179,13 @@ Ensure variety in content types and categories while maintaining brand consisten
         ...entry,
         date: new Date(entry.date),
       })),
-      summary: calendarData.summary,
+      summary: {
+        ...calendarData.summary,
+        // LLMs often omit these or return a string instead of string[].
+        // Persisting the raw value bricks Workflow (`goals.join`) and Calendar (`.map`).
+        keyThemes: toStringList(calendarData.summary?.keyThemes),
+        recommendations: toStringList(calendarData.summary?.recommendations),
+      },
     };
 
     return { success: true, data: calendar, usage: response.usage };

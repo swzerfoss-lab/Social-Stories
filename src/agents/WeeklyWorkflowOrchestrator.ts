@@ -39,6 +39,16 @@ import {
 import { ContentStorage } from '../storage/ContentStorage.js';
 import { parallelLimit } from '../utils/async.js';
 
+function toStringList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === 'string');
+  }
+  if (typeof value === 'string' && value.trim() !== '') {
+    return [value];
+  }
+  return [];
+}
+
 export class WorkflowMutationConflictError extends Error {
   constructor(message: string) {
     super(message);
@@ -643,13 +653,15 @@ export class WeeklyWorkflowOrchestrator {
       priority: this.determinePriority(entry),
     }));
 
-    // Create weekly content plan
+    // Create weekly content plan. Coerce LLM summary lists so a string/omitted
+    // recommendations value cannot be persisted and crash Workflow (`goals.join`).
+    const keyThemes = toStringList(calendar.summary?.keyThemes);
     const weekNumber = this.getWeekNumber(startDate);
     this.currentWorkflow!.strategy = {
       weekNumber,
       year: startDate.getFullYear(),
-      theme: calendar.summary.keyThemes[0] || 'Weekly Content',
-      goals: calendar.summary.recommendations,
+      theme: keyThemes[0] || 'Weekly Content',
+      goals: toStringList(calendar.summary?.recommendations),
       posts: plannedPosts,
     };
 

@@ -285,7 +285,10 @@ export default function Calendar() {
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h3 className="font-semibold text-slate-900 mb-4">Recommendations</h3>
             <ul className="space-y-3">
-              {calendar.summary.recommendations.map((rec, index) => (
+              {(Array.isArray(calendar.summary.recommendations)
+                ? calendar.summary.recommendations
+                : []
+              ).map((rec, index) => (
                 <li key={index} className="flex items-start gap-3">
                   <span className="flex items-center justify-center w-6 h-6 bg-green-100 text-green-600 rounded-full text-xs font-bold flex-shrink-0">
                     {index + 1}

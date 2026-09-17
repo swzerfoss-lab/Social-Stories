@@ -23,6 +23,16 @@ import {
 import StageCountdown from '../components/StageCountdown';
 import AssetCountdown from '../components/AssetCountdown';
 
+function formatGoalList(goals: unknown): string {
+  if (Array.isArray(goals)) {
+    return goals.filter((goal): goal is string => typeof goal === 'string').join(', ');
+  }
+  if (typeof goals === 'string') {
+    return goals;
+  }
+  return '';
+}
+
 interface SchedulerStatus {
   isRunning: boolean;
   config: {
@@ -651,7 +661,7 @@ export default function Workflow() {
                                       <strong>Theme:</strong> {workflowDetail.strategy.theme}
                                     </p>
                                     <p className="text-sm text-gray-600">
-                                      <strong>Goals:</strong> {workflowDetail.strategy.goals.join(', ')}
+                                      <strong>Goals:</strong> {formatGoalList(workflowDetail.strategy.goals)}
                                     </p>
                                   </div>
                                   <div className="space-y-3">

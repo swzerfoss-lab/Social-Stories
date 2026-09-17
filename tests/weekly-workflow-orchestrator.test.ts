@@ -778,3 +778,129 @@ describe('WeeklyWorkflowOrchestrator assembly platform notes isolation', () => {
     consoleLog.mockRestore();
   });
 });
+
+describe('WeeklyWorkflowOrchestrator strategy summary coercion', () => {
+  function createRunningStrategyWorkflow(): WeeklyWorkflow {
+    const now = new Date('2026-05-04T00:00:00.000Z');
+    return {
+      id: 'workflow-strategy-goals',
+      weekStartDate: now,
+      weekEndDate: now,
+      status: 'running',
+      currentStage: 'strategy',
+      createdAt: now,
+      posts: [],
+      errors: [],
+      metrics: {
+        totalPosts: 0,
+        postsCompleted: 0,
+        imagesGenerated: 0,
+        videosGenerated: 0,
+        startTime: now,
+      },
+      stageApprovals: [],
+      awaitingApproval: false,
+    };
+  }
+
+  function calendarEntry() {
+    return {
+      date: new Date('2026-05-04T00:00:00.000Z'),
+      dayOfWeek: 'Monday',
+      platform: 'instagram' as const,
+      contentType: 'post' as const,
+      category: 'educational' as const,
+      theme: 'Hydration',
+      briefDescription: 'Talk about moisturizers',
+      suggestedTime: '09:00 AM ET',
+    };
+  }
+
+  it('persists string recommendations as a goals array so Workflow join cannot crash', async () => {
+    const workflow = createRunningStrategyWorkflow();
+    const orchestrator = new WeeklyWorkflowOrchestrator(brandConfig);
+    const saveWorkflow = vi.fn().mockResolvedValue(undefined);
+
+    const testOrchestrator = orchestrator as unknown as {
+      currentWorkflow: WeeklyWorkflow | null;
+      storage: { saveWorkflow: typeof saveWorkflow };
+      strategyAgent: { generateCalendar: ReturnType<typeof vi.fn> };
+      executeStrategyStage: (
+        startDate: Date,
+        endDate: Date
+      ) => Promise<void>;
+    };
+
+    testOrchestrator.currentWorkflow = workflow;
+    testOrchestrator.storage = { saveWorkflow };
+    testOrchestrator.strategyAgent = {
+      generateCalendar: vi.fn().mockResolvedValue({
+        success: true,
+        data: {
+          id: 'cal-1',
+          startDate: workflow.weekStartDate,
+          endDate: workflow.weekEndDate,
+          entries: [calendarEntry()],
+          summary: {
+            totalPosts: 1,
+            postsByPlatform: { instagram: 1 },
+            postsByCategory: { educational: 1 },
+            keyThemes: 'Hydration Week',
+            recommendations: 'Focus on barrier repair this week',
+          },
+        },
+      }),
+    };
+
+    await testOrchestrator.executeStrategyStage(workflow.weekStartDate, workflow.weekEndDate);
+
+    expect(workflow.strategy?.theme).toBe('Hydration Week');
+    expect(Array.isArray(workflow.strategy?.goals)).toBe(true);
+    expect(workflow.strategy?.goals).toEqual(['Focus on barrier repair this week']);
+    expect(() => workflow.strategy!.goals.join(', ')).not.toThrow();
+    expect(saveWorkflow).toHaveBeenCalled();
+    const persisted = saveWorkflow.mock.calls[0][0] as WeeklyWorkflow;
+    expect(persisted.strategy?.goals).toEqual(['Focus on barrier repair this week']);
+  });
+
+  it('persists omitted recommendations as an empty goals array', async () => {
+    const workflow = createRunningStrategyWorkflow();
+    const orchestrator = new WeeklyWorkflowOrchestrator(brandConfig);
+    const saveWorkflow = vi.fn().mockResolvedValue(undefined);
+
+    const testOrchestrator = orchestrator as unknown as {
+      currentWorkflow: WeeklyWorkflow | null;
+      storage: { saveWorkflow: typeof saveWorkflow };
+      strategyAgent: { generateCalendar: ReturnType<typeof vi.fn> };
+      executeStrategyStage: (
+        startDate: Date,
+        endDate: Date
+      ) => Promise<void>;
+    };
+
+    testOrchestrator.currentWorkflow = workflow;
+    testOrchestrator.storage = { saveWorkflow };
+    testOrchestrator.strategyAgent = {
+      generateCalendar: vi.fn().mockResolvedValue({
+        success: true,
+        data: {
+          id: 'cal-2',
+          startDate: workflow.weekStartDate,
+          endDate: workflow.weekEndDate,
+          entries: [calendarEntry()],
+          summary: {
+            totalPosts: 1,
+            postsByPlatform: { instagram: 1 },
+            postsByCategory: { educational: 1 },
+            keyThemes: ['Hydration Week'],
+          },
+        },
+      }),
+    };
+
+    await testOrchestrator.executeStrategyStage(workflow.weekStartDate, workflow.weekEndDate);
+
+    expect(workflow.strategy?.goals).toEqual([]);
+    expect(() => workflow.strategy!.goals.join(', ')).not.toThrow();
+  });
+});
