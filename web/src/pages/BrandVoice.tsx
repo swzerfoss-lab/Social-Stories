@@ -35,33 +35,60 @@ const brandInfo = {
 };
 
 interface VoiceGuidelines {
-  voiceAttributes: string[];
-  toneByPlatform: Record<string, string>;
-  doSay: string[];
-  dontSay: string[];
-  hashtagStrategy: string[];
-  captionFormulas: string[];
+  voiceAttributes?: unknown;
+  toneByPlatform?: unknown;
+  doSay?: unknown;
+  dontSay?: unknown;
+  signaturePhrases?: unknown;
+  styleRules?: unknown;
+}
+
+function asStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item): item is string => typeof item === 'string' && item.trim() !== '');
+}
+
+function asStringRecord(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  const record: Record<string, string> = {};
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof entry === 'string' && entry.trim() !== '') {
+      record[key] = entry;
+    }
+  }
+  return record;
 }
 
 export default function BrandVoice() {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [guidelines, setGuidelines] = useState<VoiceGuidelines | null>(null);
 
   const handleGenerate = async () => {
     setIsGenerating(true);
+    setError(null);
 
     try {
       const response = await fetch('/api/brand/guidelines', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
+      const data = await response.json().catch(() => null);
 
-      if (response.ok) {
-        const data = await response.json();
+      if (response.ok && data?.voiceGuidelines) {
         setGuidelines(data.voiceGuidelines);
+      } else {
+        setGuidelines(null);
+        setError(data?.error || 'Failed to generate guidelines');
       }
     } catch (error) {
       console.error('Error generating guidelines:', error);
+      setGuidelines(null);
+      setError('Failed to generate guidelines');
     } finally {
       setIsGenerating(false);
     }
@@ -146,6 +173,10 @@ export default function BrandVoice() {
               </div>
             </div>
 
+            {error && (
+              <p className="mt-4 text-sm text-red-600">{error}</p>
+            )}
+
             <button
               onClick={handleGenerate}
               disabled={isGenerating}
@@ -203,106 +234,125 @@ export default function BrandVoice() {
               </div>
             </div>
           ) : (
-            <div className="space-y-6">
-              {/* Voice Attributes */}
-              <div className="bg-white rounded-xl border border-slate-200 p-6">
-                <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                  <MessageCircle className="w-5 h-5 text-violet-500" />
-                  Voice Attributes
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {guidelines.voiceAttributes.map((attr) => (
-                    <span
-                      key={attr}
-                      className="px-3 py-1.5 bg-violet-50 text-violet-700 text-sm font-medium rounded-lg"
-                    >
-                      {attr}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Tone by Platform */}
-              <div className="bg-white rounded-xl border border-slate-200 p-6">
-                <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                  <Eye className="w-5 h-5 text-violet-500" />
-                  Tone by Platform
-                </h3>
-                <div className="space-y-4">
-                  {Object.entries(guidelines.toneByPlatform).map(([platform, tone]) => (
-                    <div key={platform} className="flex items-start gap-4">
-                      <span className="w-24 text-sm font-medium text-slate-900 capitalize">
-                        {platform}
-                      </span>
-                      <p className="flex-1 text-sm text-slate-600">{tone}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Do Say / Don't Say */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-green-50 border border-green-200 rounded-xl p-6">
-                  <h3 className="font-semibold text-green-900 mb-4 flex items-center gap-2">
-                    <Check className="w-5 h-5" />
-                    Do Say
-                  </h3>
-                  <ul className="space-y-2">
-                    {guidelines.doSay.map((item, i) => (
-                      <li key={i} className="text-sm text-green-800">
-                        "{item}"
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-                  <h3 className="font-semibold text-red-900 mb-4 flex items-center gap-2">
-                    <span className="text-lg">×</span>
-                    Don't Say
-                  </h3>
-                  <ul className="space-y-2">
-                    {guidelines.dontSay.map((item, i) => (
-                      <li key={i} className="text-sm text-red-800">
-                        "{item}"
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-
-              {/* Hashtag Strategy */}
-              <div className="bg-white rounded-xl border border-slate-200 p-6">
-                <h3 className="font-semibold text-slate-900 mb-4"># Hashtag Strategy</h3>
-                <div className="flex flex-wrap gap-2">
-                  {guidelines.hashtagStrategy.map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-2.5 py-1 bg-alpine-50 text-alpine-700 text-sm rounded-full"
-                    >
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Caption Formulas */}
-              <div className="bg-white rounded-xl border border-slate-200 p-6">
-                <h3 className="font-semibold text-slate-900 mb-4">Caption Formulas</h3>
-                <div className="space-y-3">
-                  {guidelines.captionFormulas.map((formula, i) => (
-                    <div
-                      key={i}
-                      className="p-4 bg-slate-50 border border-slate-100 rounded-lg"
-                    >
-                      <p className="text-sm text-slate-700">{formula}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <VoiceGuidelinesView guidelines={guidelines} />
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function VoiceGuidelinesView({ guidelines }: { guidelines: VoiceGuidelines }) {
+  const voiceAttributes = asStringList(guidelines.voiceAttributes);
+  const toneByPlatform = asStringRecord(guidelines.toneByPlatform);
+  const doSay = asStringList(guidelines.doSay);
+  const dontSay = asStringList(guidelines.dontSay);
+  const signaturePhrases = asStringList(guidelines.signaturePhrases);
+  const styleRules = asStringList(guidelines.styleRules);
+  const toneEntries = Object.entries(toneByPlatform);
+
+  return (
+    <div className="space-y-6">
+      {voiceAttributes.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 p-6">
+          <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <MessageCircle className="w-5 h-5 text-violet-500" />
+            Voice Attributes
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {voiceAttributes.map((attr) => (
+              <span
+                key={attr}
+                className="px-3 py-1.5 bg-violet-50 text-violet-700 text-sm font-medium rounded-lg"
+              >
+                {attr}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {toneEntries.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 p-6">
+          <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <Eye className="w-5 h-5 text-violet-500" />
+            Tone by Platform
+          </h3>
+          <div className="space-y-4">
+            {toneEntries.map(([platform, tone]) => (
+              <div key={platform} className="flex items-start gap-4">
+                <span className="w-24 text-sm font-medium text-slate-900 capitalize">
+                  {platform}
+                </span>
+                <p className="flex-1 text-sm text-slate-600">{tone}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(doSay.length > 0 || dontSay.length > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-green-50 border border-green-200 rounded-xl p-6">
+            <h3 className="font-semibold text-green-900 mb-4 flex items-center gap-2">
+              <Check className="w-5 h-5" />
+              Do Say
+            </h3>
+            <ul className="space-y-2">
+              {doSay.map((item) => (
+                <li key={item} className="text-sm text-green-800">
+                  "{item}"
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+            <h3 className="font-semibold text-red-900 mb-4 flex items-center gap-2">
+              <span className="text-lg">×</span>
+              Don't Say
+            </h3>
+            <ul className="space-y-2">
+              {dontSay.map((item) => (
+                <li key={item} className="text-sm text-red-800">
+                  "{item}"
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {signaturePhrases.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 p-6">
+          <h3 className="font-semibold text-slate-900 mb-4">Signature Phrases</h3>
+          <div className="flex flex-wrap gap-2">
+            {signaturePhrases.map((phrase) => (
+              <span
+                key={phrase}
+                className="px-2.5 py-1 bg-alpine-50 text-alpine-700 text-sm rounded-full"
+              >
+                {phrase}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {styleRules.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 p-6">
+          <h3 className="font-semibold text-slate-900 mb-4">Style Rules</h3>
+          <div className="space-y-3">
+            {styleRules.map((rule) => (
+              <div
+                key={rule}
+                className="p-4 bg-slate-50 border border-slate-100 rounded-lg"
+              >
+                <p className="text-sm text-slate-700">{rule}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

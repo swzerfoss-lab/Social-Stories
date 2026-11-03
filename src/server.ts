@@ -21,6 +21,10 @@ import { generalLimiter, generationLimiter, workflowLimiter } from './middleware
 import { requireAdminAuth } from './middleware/auth.js';
 import { applyTrustProxy } from './middleware/trustProxy.js';
 import {
+  presentVoiceGuidelines,
+  voiceGuidelinesHaveContent,
+} from './brandVoiceGuidelines.js';
+import {
   validate,
   WorkflowTriggerSchema,
   ContentGenerateSchema,
@@ -513,11 +517,14 @@ app.post('/api/calendar/generate', async (req, res) => {
 app.post('/api/brand/guidelines', async (_req, res) => {
   try {
     const result = await manager.generateBrandGuidelines();
+    // The agent returns voicePillars, not the voiceAttributes the page used to
+    // read. Present a stable view so a successful payload cannot throw in render.
+    const voiceGuidelines = presentVoiceGuidelines(result.data?.voiceGuidelines);
 
-    if (result.success && result.data) {
+    if (result.data && voiceGuidelines && voiceGuidelinesHaveContent(voiceGuidelines)) {
       res.json({
         success: true,
-        voiceGuidelines: result.data.voiceGuidelines,
+        voiceGuidelines,
         visualGuidelines: result.data.visualGuidelines,
       });
     } else {
